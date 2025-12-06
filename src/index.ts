@@ -136,7 +136,7 @@ app.post("/UpdateOne", async (req, res) => {
 app.post("/UpdateBulk", async (req, res) => {
   try {
     const client = await getMongoClient();
-    const collection = client.db("ArcadeHaven").collection("items");
+    const collection = client.db("cool").collection("cp");
 
     const bulkOps = [];
     const updates = req.body.updates;
@@ -189,6 +189,106 @@ app.post("/UpdateBulk", async (req, res) => {
     });
   }
 });
+
+app.get("/GetInventory", async (req, res) => {
+  const sendResponse = (statusCode: number, content: any) => {
+    res.status(statusCode).json(content);
+  };
+
+  try {
+    const { id: userId } = req.query;
+    if (!userId || isNaN(Number(userId))) {
+      return sendResponse(400, {
+        status: "error",
+        message: "Invalid User ID",
+      });
+    }
+
+    const client = await getMongoClient();
+    const database = client.db("cool");
+
+    await checkIfEligibleForStarterItems(database, parseInt(userId as string));
+    const items = await getItems(database, userId as string);
+    const gamepasses = await getGamePasses(database, userId as string);
+
+    sendResponse(200, {
+      success: true,
+      data: formatInventory(items, userId as string),
+      gamepasses,
+    });
+  } catch (error) {
+    console.error(error);
+    sendResponse(500, { status: "error", message: "Internal Server Error" });
+  }
+});
+
+// -----------------------------
+// Supporting functions for inventory
+// -----------------------------
+async function getItems(database: any, userId: string) {
+  const collection = database.collection("cp");
+  return collection
+    .find(
+      { "serials.u": parseInt(userId) },
+      { projection: { "serials.u": 1, "serials._id": 1, itemId: 1 } }
+    )
+    .toArray();
+}
+
+async function getGamePasses(database: any, userId: string) {
+  const collection = database.collection("gifted_gamepasses");
+  const doc = (await collection.findOne({ user_id: parseInt(userId) })) || {};
+  return doc.gamepasses || [];
+}
+
+function formatInventory(items: any[], userId: string) {
+  const inventory: Record<string, string[]> = {};
+  items.forEach((item) => {
+    const userSerials = item.serials
+      .map((serial: any, index: number) =>
+        serial && serial.u === parseInt(userId) ? String(index + 1) : null
+      )
+      .filter((serial) => serial !== null);
+
+    if (userSerials.length > 0) {
+      inventory[item.itemId] = inventory[item.itemId] || [];
+      inventory[item.itemId].push(...userSerials);
+    }
+  });
+  return inventory;
+}
+
+async function checkIfEligibleForStarterItems(database: any, userId: number) {
+  const collection = database.collection("user_analytics");
+  let user = await collection.findOne({ userId });
+
+  if (!user) {
+    await collection.insertOne({ userId, claimedStarterItems: false });
+    user = { claimedStarterItems: false };
+  }
+
+  if (user.claimedStarterItems) return;
+
+  const items_collection = database.collection("items");
+  const starterItem = await items_collection.findOne(
+    { tag: "starter" },
+    { projection: { itemId: 1 } }
+  );
+  if (!starterItem) return;
+
+  await items_collection.updateOne(
+    { itemId: starterItem.itemId },
+    {
+      $push: { serials: { u: userId, t: Math.floor(Date.now() / 1000) } },
+      $inc: { totalQuantity: 1, quantitySold: 1 },
+    }
+  );
+
+  await collection.updateOne(
+    { userId },
+    { $set: { claimedStarterItems: true } }
+  );
+}
 
 
 
