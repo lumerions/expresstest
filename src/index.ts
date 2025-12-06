@@ -85,7 +85,7 @@ app.post("/update-item", async (req, res) => {
   let Processing = {}
 
   try {
-    const collection = mongo_client.db("ArcadeHaven").collection("items")
+    const collection = mongo_client.db("cool").collection("cp")
     const filter = req.body.filter
     const update = req.body.update
 
