@@ -12,6 +12,15 @@ app.use(express.json()) // required for POST JSON bodies
 // ----------------- MONGO CLIENT -----------------
 const mongo_client = new MongoClient("mongodb+srv://MongoDB:r7jBEW8yIWqcLZp3@cluster0.m96ya.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
 await mongo_client.connect()
+
+
+async function getMongoClient() {
+  if (!mongo_client) {
+    mongo_client = new MongoClient("mongodb+srv://MongoDB:r7jBEW8yIWqcLZp3@cluster0.m96ya.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0");
+    await mongo_client.connect();
+  }
+  return mongo_client;
+}
 console.log("Connected to MongoDB")
 
 // ----------------- HOME ROUTE -----------------
