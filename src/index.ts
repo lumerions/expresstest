@@ -93,8 +93,9 @@ curl -X POST https://your-domain/update-item \\
 app.post("/UpdateOne", async (req, res) => {
   try {
     // Ensure MongoDB is connected
-    if (!mongo_client || !mongo_client.isConnected?.()) {
-      return res.status(500).json({ status: "error", message: "MongoDB not connected" });
+
+    if (!mongo_client) {
+      return res.status(500).json({ status: "error", message: "MongoDB client not initialized" });
     }
 
     const collection = mongo_client.db("cool").collection("cp");
