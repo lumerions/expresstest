@@ -350,6 +350,65 @@ app.get("/GetInventoryBulk", async (req, res) => {
   }
 });
 
+app.get("/GetItem", async (req, res) => {
+  try {
+    const client = await getMongoClient();
+    const collection = client.db("cool").collection("cp");
+
+    // Copy query filters
+    const filter: any = { ...req.query };
+
+    if (filter.itemId) {
+      filter.itemId = parseInt(filter.itemId as string);
+    }
+
+    // MongoDB aggregation pipeline
+    const cursor = collection.aggregate([
+      { $match: filter },
+      {
+        $project: {
+          _id: 0,
+          serials: 1,
+          itemId: 1,
+          name: 1,
+          creator: 1,
+          description: 1,
+          type: 1,
+          originalPrice: 1,
+          releaseTime: 1,
+          rap: 1,
+          quantitySold: 1,
+          history: 1,
+          reselling: 1,
+          tradeable: 1,
+          offsaleTime: 1,
+          value: 1,
+          projected: 1,
+          totalQuantity: 1,
+        },
+      },
+      {
+        $project: {
+          "serials.h": 0, // hide history inside serials
+        },
+      },
+    ]);
+
+    const items = await cursor.toArray();
+
+    res.status(200).json({
+      status: "success",
+      data: items,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      status: "error",
+      message: "Internal server error",
+    });
+  }
+});
+
 
 
 // ======================================================================
