@@ -136,9 +136,11 @@ app.post("/UpdateOne", async (req, res) => {
     }
 
     // --- 3. Perform the update safely ---
-    const result = await collection.findOneAndUpdate(filter, update, {
-      returnDocument: "after", // MongoDB Node.js driver v4+
-    });
+    const result = await collection.findOneAndUpdate(filter, update, { returnOriginal: false });
+
+   // const result = await collection.findOneAndUpdate(filter, update, {
+    //  returnDocument: "after", // MongoDB Node.js driver v4+
+   // });
 
     if (!result.value) {
       return res.status(404).json({
