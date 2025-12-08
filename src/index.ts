@@ -143,11 +143,14 @@ console.log("UPDATE:", JSON.stringify(update, null, 2));
     });
 
     if (!result.value) {
-      return res.status(404).json({
-        status: "error",
-        message: "No documents matched the filter",
-      });
-    }
+  await collection.updateOne(filter, update);
+  const docAfter = await collection.findOne(filter);
+  return res.status(200).json({
+    status: "success",
+    message: "Update successful (fallback)",
+    data: docAfter,
+  });
+}
 
     return res.status(200).json({
       status: "success",
