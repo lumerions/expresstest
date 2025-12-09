@@ -189,7 +189,7 @@ app.post('/insert-item', async (req, res) => {
         console.error("MongoDB error:", err);
         res.status(500).json({ error: "MongoDB error", details: err.message });
     } finally {
-        await client.close();
+        console.log('done')
     }
 });
 
