@@ -87,7 +87,7 @@ curl -X POST https://your-domain/update-item \\
 })
 
 app.post('/insert-item', async (req, res) => {
-    const client = new MongoClient(mongouri);
+    const client = getMongoClient();
 
    const {
         itemId,
