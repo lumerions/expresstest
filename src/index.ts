@@ -181,8 +181,7 @@ app.post('/insert-item', async (req, res) => {
     releaseTime: Math.floor(Date.now() / 1000),
     offsaleTime: 0
 };
-fsaleTime: 0
-    };
+
 
     try {
         const db = client.db("cool");
