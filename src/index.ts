@@ -133,7 +133,7 @@ app.post("/update-value", async (req, res) => {
 app.post('/insert-item', async (req, res) => {
     const client = await getMongoClient();
 
-   const {
+   let {
         itemId,
         originalPrice,
         totalQuantity,
