@@ -86,6 +86,70 @@ curl -X POST https://your-domain/update-item \\
   `)
 })
 
+app.post('/insert-item', async (req, res) => {
+    const client = new MongoClient(mongouri);
+
+   const {
+        itemId,
+        originalPrice,
+        totalQuantity,
+        creator,
+        name,
+        description
+    } = req.body;
+
+    if (!itemId || !originalPrice || !totalQuantity || !creator || !name || description === undefined) {
+        return res.status(400).json({
+            error: "Missing required fields: itemId, originalPrice, totalQuantity, creator, name, description"
+        });
+    }
+    const itemData = {
+        name,
+        description,
+        itemId,
+        type: "unique",
+        originalPrice,
+        totalQuantity,
+        tradeable: true,
+        creator,
+        quantitySold: 0,
+        rap: 0,
+        value: 0,
+        serials: [],
+        reselling: {},
+        history: {
+            rap: [],
+            sales: [],
+            price: []
+        },
+        releaseTime: Math.floor(Date.now() / 1000),
+        offsaleTime: 0
+    };
+  
+    try {
+        await client.connect();
+        const db = client.db("cool");
+        const items = db.collection("cp");
+
+        const result = await items.insertOne(itemData);
+        const insertedItem = await items.findOne({ _id: result.insertedId });
+        const allItems = await items.find({}).toArray();
+
+        res.status(200).json({
+            message: "Item inserted successfully",
+            insertedId: result.insertedId,
+            insertedItem,
+            allItems
+        });
+
+    } catch (err) {
+        console.error("MongoDB error:", err);
+        res.status(500).json({ error: "MongoDB error", details: err.message });
+    } finally {
+        await client.close();
+    }
+});
+
 
 // ======================================================================
 //                🔥  NEW ROUTE USING YOUR SCRIPT 2 LOGIC 🔥
