@@ -160,26 +160,28 @@ app.post('/insert-item', async (req, res) => {
     }
 
       const itemData = {
-        name,
-        description,
-        Number(itemId),
-        type: "unique",
-        Number(originalPrice),
-        Number(totalQuantity),
-        tradeable: true,
-        creator,
-        quantitySold: 0,
-        rap: 0,
-        value: 0,
-        serials: [], 
-        reselling: {},
-        history: {
-            rap: [],
-            sales: [],
-            price: []
-        },
-        releaseTime: Math.floor(Date.now() / 1000),
-        offsaleTime: 0
+    itemId: Number(itemId),
+    name,
+    description,
+    type: "unique",
+    originalPrice: Number(originalPrice),
+    totalQuantity: Number(totalQuantity),
+    tradeable: true,
+    creator,
+    quantitySold: 0,
+    rap: 0,
+    value: 0,
+    serials: [], 
+    reselling: {},
+    history: {
+        rap: [],
+        sales: [],
+        price: []
+    },
+    releaseTime: Math.floor(Date.now() / 1000),
+    offsaleTime: 0
+};
+fsaleTime: 0
     };
 
     try {
