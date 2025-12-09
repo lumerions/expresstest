@@ -127,7 +127,6 @@ app.post('/insert-item', async (req, res) => {
     };
   
     try {
-        await client.connect();
         const db = client.db("cool");
         const items = db.collection("cp");
 
