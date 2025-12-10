@@ -258,19 +258,11 @@ if (doc) {
     console.log("FILTER:", JSON.stringify(filter, null, 2));
 console.log("UPDATE:", JSON.stringify(update, null, 2));
 
-    const result = await collection.findOneAndUpdate(filter, update, {
-      returnDocument: "after", // MongoDB Node.js driver v4+
-    });
-
-    if (!result.value) {
-  await collection.updateOne(filter, update);
-  const docAfter = await collection.findOne(filter);
-  return res.status(200).json({
-    status: "success",
-    message: "Update successful (fallback)",
-    data: docAfter,
-  });
-}
+    const result = await collection.findOneAndUpdate(
+      filter,
+      update,
+      { returnDocument: "after", upsert: true }
+    );
 
     return res.status(200).json({
       status: "success",
