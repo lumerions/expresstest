@@ -10,9 +10,7 @@ const app = express()
 app.use(express.json()) // required for POST JSON bodies
 
 // ----------------- MONGO CLIENT -----------------
-let mongo_client = new MongoClient("mongodb+srv://MongoDB:r7jBEW8yIWqcLZp3@cluster0.m96ya.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
-await mongo_client.connect()
-
+let mongo_client 
 
 async function getMongoClient() {
   if (!mongo_client) {
@@ -211,6 +209,9 @@ app.post('/insert-item', async (req, res) => {
 //                🔥  NEW ROUTE USING YOUR SCRIPT 2 LOGIC 🔥
 // ======================================================================
 app.post("/UpdateOne", async (req, res) => {
+
+  await getMongoClient(); 
+
   try {
     if (!mongo_client) {
       return res.status(500).json({ status: "error", message: "MongoDB client not initialized" });
