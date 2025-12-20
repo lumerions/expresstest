@@ -187,13 +187,11 @@ app.post('/insert-item', async (req, res) => {
 
         const result = await items.insertOne(itemData);
         const insertedItem = await items.findOne({ _id: result.insertedId });
-        const allItems = await items.find({}).toArray();
 
         res.status(200).json({
             message: "Item inserted successfully",
             insertedId: result.insertedId,
-            insertedItem,
-            allItems
+            insertedItem
         });
 
     } catch (err) {
