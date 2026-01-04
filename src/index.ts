@@ -166,15 +166,15 @@ app.post("/UpdateOne", async (req, res) => {
     }
 
     const doc = await collection.findOne(filter);
-if (doc) {
-  if (!Array.isArray(doc.history) && doc.history) {
-    await collection.updateOne(filter, { $set: { history: [doc.history] } });
-  }
-  if (!Array.isArray(doc.serials) && doc.serials) {
-    await collection.updateOne(filter, { $set: { serials: [doc.serials] } });
-  }
-}
-    
+    if (doc) {
+      if (!Array.isArray(doc.history) && doc.history) {
+        await collection.updateOne(filter, { $set: { history: [doc.history] } });
+      }
+      if (!Array.isArray(doc.serials) && doc.serials) {
+        await collection.updateOne(filter, { $set: { serials: [doc.serials] } });
+      }
+    }
+        
 
     try {
       const quantityInc = update["$inc"]?.quantitySold;
@@ -481,10 +481,6 @@ app.get("/GetItem", async (req, res) => {
     });
   }
 });
-
-
-export default app
-
 
 
 export default app
