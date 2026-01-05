@@ -4,8 +4,9 @@ import { fileURLToPath } from 'url'
 import { MongoClient } from 'mongodb'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-import axios from 'axios'; 
-import crypto from 'crypto'; 
+const axios = require("axios");
+const crypto = require("crypto");
+
 const {
   getGamePassProductInfo,
   getUsernameFromId,
