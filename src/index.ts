@@ -554,14 +554,6 @@ app.delete("/unlist", async (req, res) => {
   }
 });
 
-
-function validateInput(req) {
-  const { user_id, item, gamepass_id } = req.body;
-  if (!user_id || !item || !gamepass_id) {
-    throw new Error("Invalid Input");
-  }
-}
-
 async function getRobuxMarket(client) {
   return client.db("cool").collection("robuxmarket");
 }
@@ -574,7 +566,7 @@ async function getSettings(client) {
   return client.db("cool").collection("game_settings");
 }
 
-app.post("/list", authMiddleware, async (req, res) => {
+app.post("/list", async (req, res) => {
   try {
     validateInput(req);
 
@@ -732,7 +724,7 @@ app.get("/get", async (req, res) => {
 });
 
 
-app.post("/buy", authMiddleware, async (req, res) => {
+app.post("/buy", async (req, res) => {
   try {
     const client = await getMongoClient();
     const database = client.db("cool");
@@ -744,6 +736,9 @@ app.post("/buy", authMiddleware, async (req, res) => {
 
     itemid = parseInt(itemid);
     serial = parseInt(serial) - 1;
+    const processing_token = crypto.randomBytes(16).toString("hex");
+    const robux_market = database.collection("robuxmarket");
+    const items = database.collection("cp");
 
     
     const lockResult = await robux_market.findOneAndUpdate(
@@ -771,14 +766,14 @@ app.post("/buy", authMiddleware, async (req, res) => {
       });
     }
 
-
-      const robux_market = database.collection("robux_market");
-      const items = database.collection("items");
-
       const listed_doc = await robux_market.findOne({ itemId: itemid, serial });
 
       if (!listed_doc) {
-        redis_client.del(unique_token);
+          await robux_market.updateOne(
+            { itemId: itemid, serial },
+            { $unset: { _PROCESSING: "", _PROCESSING_TIME: "" } }
+          );
+
         return res.status(400).json({
           status: "error",
           error: "Item not listed",
@@ -791,7 +786,11 @@ app.post("/buy", authMiddleware, async (req, res) => {
       );
 
       if (!item_doc) {
-        redis_client.del(unique_token);
+          await robux_market.updateOne(
+            { itemId: itemid, serial },
+            { $unset: { _PROCESSING: "", _PROCESSING_TIME: "" } }
+          );
+
         return res.status(400).json({
           status: "error",
           error: "Invalid Item",
@@ -801,7 +800,11 @@ app.post("/buy", authMiddleware, async (req, res) => {
       const serial_info = item_doc.serials[serial];
 
       if (!serial_info || serial_info.u !== listed_doc.userId) {
-        redis_client.del(unique_token);
+          await robux_market.updateOne(
+            { itemId: itemid, serial },
+            { $unset: { _PROCESSING: "", _PROCESSING_TIME: "" } }
+          );
+
         await robux_market.deleteOne({ itemId: itemid, serial });
 
         return res.status(400).json({
@@ -884,8 +887,6 @@ app.post("/buy", authMiddleware, async (req, res) => {
 
         return res.json({ status: "success" });
       }
-
-      const processing_token = crypto.randomBytes(16).toString("hex");
 
       const gamepass_info = await getGamePassProductInfo(
         listed_doc.gamepassId
