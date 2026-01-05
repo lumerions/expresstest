@@ -5,7 +5,6 @@ import { MongoClient } from 'mongodb'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 import axios from 'axios'; 
-import Redis from 'ioredis';
 import crypto from 'crypto'; 
 const {
   getGamePassProductInfo,
@@ -929,6 +928,7 @@ app.post("/buy", async (req, res) => {
 
 
 export default app
+
 
 
 
