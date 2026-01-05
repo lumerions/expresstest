@@ -8,11 +8,7 @@ import crypto from 'crypto'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-const {
-  getGamePassProductInfo,
-  getUsernameFromId,
-  getThumbnails,
-} = require("noblox.js"); 
+import { getGamePassProductInfo, getUsernameFromId, getThumbnails } from "noblox.js";
 
 const app = express()
 app.use(express.json()) 
