@@ -4,9 +4,9 @@ import { fileURLToPath } from 'url'
 import { MongoClient } from 'mongodb'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const axios = require("axios");
-const Redis = require("ioredis");
-const crypto = require("crypto");
+import axios from 'axios'; 
+import Redis from 'ioredis';
+import crypto from 'crypto'; 
 const {
   getGamePassProductInfo,
   getUsernameFromId,
@@ -928,9 +928,7 @@ app.post("/buy", async (req, res) => {
 });
 
 
-
 export default app
-
 
 
 
