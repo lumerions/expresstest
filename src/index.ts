@@ -558,7 +558,7 @@ async function getRobuxMarket(client) {
   return client.db("cool").collection("robuxmarket");
 }
 
-async function getItems(client) {
+async function getItemss(client) {
   return client.db("cool").collection("cp");
 }
 
@@ -579,7 +579,7 @@ app.post("/list", async (req, res) => {
     const client = await getMongoClient();
 
     const robux_market = await getRobuxMarket(client);
-    const items = await getItems(client);
+    const items = await getItemss(client);
     const settings = await getSettings(client);
 
     const settings_doc = await settings.findOne({
@@ -926,6 +926,11 @@ app.post("/buy", async (req, res) => {
     });
   }
 });
+
+
+
+export default app
+
 
 
 
