@@ -1,18 +1,19 @@
+
 import express from 'express'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { MongoClient } from 'mongodb'
+import axios from 'axios'
+import crypto from 'crypto'
+
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const axios = require("axios");
-const crypto = require("crypto");
 
 const {
   getGamePassProductInfo,
   getUsernameFromId,
   getThumbnails,
-} = require("noblox.js");
-
+} = require("noblox.js"); 
 
 const app = express()
 app.use(express.json()) 
@@ -929,8 +930,6 @@ app.post("/buy", async (req, res) => {
 
 
 export default app
-
-
 
 
 
