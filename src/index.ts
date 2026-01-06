@@ -740,9 +740,7 @@ app.post("/buy", async (req, res) => {
     robux_market = db.collection("robuxmarket");
     items = db.collection("cp");
 
-    /* --------------------------------------------------
-       STEP 1: Lock existing listing
-    -------------------------------------------------- */
+
     if (!token) {
       const lockResult = await robux_market.findOneAndUpdate(
         {
@@ -802,10 +800,6 @@ app.post("/buy", async (req, res) => {
         token: processing_token,
       });
     }
-
-    /* --------------------------------------------------
-       STEP 2: Finalize purchase
-    -------------------------------------------------- */
 
     const lockedDoc = await robux_market.findOne({
       itemId: itemid,
