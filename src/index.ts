@@ -727,6 +727,7 @@ app.post("/buy", async (req, res) => {
   serial = parseInt(serial) - 1;
 
   const processing_token = crypto.randomBytes(16).toString("hex");
+  const LOCK_TIMEOUT = 5 * 60 * 1000;
 
   let client;
   let robux_market;
@@ -734,55 +735,42 @@ app.post("/buy", async (req, res) => {
 
   try {
     client = await getMongoClient();
-    const database = client.db("cool");
+    const db = client.db("cool");
 
-    robux_market = database.collection("robuxmarket");
-    items = database.collection("cp");
+    robux_market = db.collection("robuxmarket");
+    items = db.collection("cp");
 
-
+    /* --------------------------------------------------
+       STEP 1: Lock existing listing
+    -------------------------------------------------- */
     if (!token) {
-            const LOCK_TIMEOUT = 5 * 60 * 1000;
-      
       const lockResult = await robux_market.findOneAndUpdate(
-        { itemId: itemid, serial },
         {
-          $setOnInsert: { itemId: itemid, serial },
+          itemId: itemid,
+          serial,
+          $or: [
+            { _PROCESSING: { $exists: false } },
+            { _PROCESSING_TIME: { $lt: Date.now() - LOCK_TIMEOUT } },
+          ],
+        },
+        {
           $set: {
             _PROCESSING: processing_token,
             _PROCESSING_TIME: Date.now(),
           },
         },
-        { upsert: true, returnDocument: "before" }
+        { returnDocument: "after" }
       );
-      
-      let lockedDoc = lockResult.value;
-      
-      if (
-        lockedDoc &&
-        lockedDoc._PROCESSING &&
-        lockedDoc._PROCESSING_TIME > Date.now() - LOCK_TIMEOUT
-      ) {
+
+      if (!lockResult.value) {
         return res.status(400).json({
           status: "error",
-          error: "Item already processing",
+          error: "Item already processing or not listed",
         });
       }
-      
-      if (!lockedDoc) {
-        lockedDoc = await robux_market.findOne({
-          itemId: itemid,
-          serial,
-          _PROCESSING: processing_token,
-        });
-      }
-      
-      if (!lockedDoc) {
-        return res.status(400).json({
-          status: "error",
-          error: "Item not listed",
-        });
-      }
-      
+
+      const lockedDoc = lockResult.value;
+
       if (lockedDoc.userId === user_id) {
         await robux_market.updateOne(
           { itemId: itemid, serial, _PROCESSING: processing_token },
@@ -793,7 +781,6 @@ app.post("/buy", async (req, res) => {
           error: "Cannot buy your own item",
         });
       }
-
 
       const gamepass_info = await getGamePassProductInfo(
         lockedDoc.gamepassId
@@ -816,6 +803,9 @@ app.post("/buy", async (req, res) => {
       });
     }
 
+    /* --------------------------------------------------
+       STEP 2: Finalize purchase
+    -------------------------------------------------- */
 
     const lockedDoc = await robux_market.findOne({
       itemId: itemid,
@@ -859,6 +849,10 @@ app.post("/buy", async (req, res) => {
         error: "Item ownership changed",
       });
     }
+
+    /* --------------------------------------------------
+       Transfer ownership
+    -------------------------------------------------- */
 
     await items.updateOne(
       { itemId: itemid },
