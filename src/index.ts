@@ -719,173 +719,312 @@ app.get("/get", async (req, res) => {
   }
 });
 
+
 app.post("/buy", async (req, res) => {
   const { user_id, item, token, cancel } = req.body;
+  
+  if (!Array.isArray(item) || item.length !== 2) {
+    return res.status(400).json({
+      status: "error",
+      error: "Invalid item format"
+    });
+  }
+  
   let [itemid, serial] = item;
-
   itemid = parseInt(itemid);
   serial = parseInt(serial) - 1;
 
-  const processing_token = crypto.randomBytes(16).toString("hex");
-  const LOCK_TIMEOUT = 5 * 60 * 1000;
-
+  const LOCK_TIMEOUT = 5 * 60 * 1000; // 5 minutes
   let client;
-  let robux_market;
-  let items;
-
+  
   try {
     client = await getMongoClient();
     const db = client.db("cool");
-
-    robux_market = db.collection("robuxmarket");
-    items = db.collection("cp");
-
+    const robux_market = db.collection("robuxmarket");
+    const items = db.collection("cp");
     
+    // --- PHASE 1: ACQUIRE LOCK ---
     if (!token) {
-      const listedDoc = await robux_market.findOne({ itemId: itemid, serial });
+      // Clean up any stale locks first
+      await robux_market.updateMany(
+        {
+          itemId: itemid,
+          serial,
+          _PROCESSING_TIME: { $lt: Date.now() - LOCK_TIMEOUT }
+        },
+        {
+          $unset: { _PROCESSING: "", _PROCESSING_TIME: "" }
+        }
+      );
+      
+      // Check if item exists
+      const listedDoc = await robux_market.findOne({ 
+        itemId: itemid, 
+        serial 
+      });
+      
       if (!listedDoc) {
         return res.status(400).json({
           status: "error",
           error: "Item not listed",
         });
       }
-    
-      // 2️⃣ Try to acquire lock
+      
+      // Check if user is trying to buy their own item
+      if (listedDoc.userId === user_id) {
+        return res.status(400).json({
+          status: "error",
+          error: "Cannot buy your own item",
+        });
+      }
+      
+      // Attempt to acquire lock
+      const processing_token = crypto.randomBytes(16).toString("hex");
+      
+      // Use findOneAndUpdate with optimistic concurrency control
       const lockResult = await robux_market.findOneAndUpdate(
         {
           itemId: itemid,
           serial,
           $or: [
             { _PROCESSING: { $exists: false } },
-            { _PROCESSING_TIME: { $lt: Date.now() - LOCK_TIMEOUT } },
-          ],
+            { _PROCESSING: "" },
+            { _PROCESSING: null },
+            { 
+              _PROCESSING_TIME: { 
+                $lt: Date.now() - LOCK_TIMEOUT 
+              } 
+            }
+          ]
         },
         {
           $set: {
             _PROCESSING: processing_token,
             _PROCESSING_TIME: Date.now(),
-          },
+            _PROCESSING_USER: user_id
+          }
         },
-        { returnDocument: "after" }
+        {
+          returnDocument: "after",
+          upsert: false
+        }
       );
-    
-      const lockedDoc = lockResult.value;
-    
-      if (!lockedDoc) {
+      
+      if (!lockResult.value) {
+        // Check if item is already being processed by same user
+        const currentLock = await robux_market.findOne({
+          itemId: itemid,
+          serial,
+          _PROCESSING_USER: user_id
+        });
+        
+        if (currentLock) {
+          return res.json({
+            status: "processing",
+            token: currentLock._PROCESSING,
+          });
+        }
+        
         return res.status(400).json({
           status: "error",
-          error: "Item already processing",
+          error: "Item already being processed by another user",
         });
       }
-    
-      if (lockedDoc.userId === user_id) {
-        await robux_market.updateOne(
-          { itemId: itemid, serial, _PROCESSING: processing_token },
-          { $unset: { _PROCESSING: "", _PROCESSING_TIME: "" } }
-        );
-        return res.status(400).json({
-          status: "error",
-          error: "Cannot buy your own item",
-        });
-      }
-    
-      // 4️⃣ Return token to continue purchase
+      
+      console.log(`Lock acquired for item ${itemid}-${serial} by user ${user_id}`);
+      
       return res.json({
         status: "processing",
         token: processing_token,
       });
     }
-
-    const lockedDoc = await robux_market.findOne({
-      itemId: itemid,
-      serial,
-      _PROCESSING: token,
-    });
-
-    if (!lockedDoc) {
-      return res.status(400).json({
-        status: "error",
-        error: "Invalid or expired token",
-      });
-    }
-
-    if (cancel === true) {
-      await robux_market.updateOne(
-        { itemId: itemid, serial, _PROCESSING: token },
-        { $unset: { _PROCESSING: "", _PROCESSING_TIME: "" } }
-      );
-      return res.json({ status: "success" });
-    }
-
-    const item_doc = await items.findOne(
-      { itemId: itemid },
-      { projection: { "serials.h": 0, history: 0, reselling: 0 } }
-    );
-
-    if (!item_doc) {
-      return res.status(400).json({
-        status: "error",
-        error: "Invalid item",
-      });
-    }
-
-    const serial_info = item_doc.serials[serial];
-
-    if (!serial_info || serial_info.u !== lockedDoc.userId) {
-      await robux_market.deleteOne({ itemId: itemid, serial });
-      return res.status(400).json({
-        status: "error",
-        error: "Item ownership changed",
-      });
-    }
-
-    /* --------------------------------------------------
-       Transfer ownership
-    -------------------------------------------------- */
-
-    await items.updateOne(
-      { itemId: itemid },
-      {
-        $set: {
-          [`serials.${serial}.u`]: user_id,
-          [`serials.${serial}.t`]: Math.floor(Date.now() / 1000),
-        },
-        $unset: {
-          [`reselling.${serial}`]: "",
-        },
-        $push: {
-          [`serials.${serial}.h`]: [
-            "robux_market",
-            lockedDoc.userId,
-            user_id,
-            lockedDoc.price,
-            Date.now(),
-          ],
-        },
+    
+    // --- PHASE 2: PROCESS PURCHASE ---
+    const session = client.startSession();
+    
+    try {
+      session.startTransaction();
+      
+      // Verify the lock is still valid
+      const lockedDoc = await robux_market.findOne({
+        itemId: itemid,
+        serial,
+        _PROCESSING: token,
+        _PROCESSING_USER: user_id,
+        _PROCESSING_TIME: { $gte: Date.now() - LOCK_TIMEOUT }
+      }, { session });
+      
+      if (!lockedDoc) {
+        await session.abortTransaction();
+        return res.status(400).json({
+          status: "error",
+          error: "Invalid, expired, or mismatched token",
+        });
       }
-    );
-
-    await robux_market.updateOne(
-      { itemId: "analytics" },
-      {
-        $inc: {
-          total_sales: 1,
-          total_robux: lockedDoc.price,
-          game_raised: lockedDoc.price * 0.1,
+      
+      // Handle cancellation
+      if (cancel === true) {
+        await robux_market.updateOne(
+          { 
+            itemId: itemid, 
+            serial, 
+            _PROCESSING: token 
+          },
+          {
+            $unset: { 
+              _PROCESSING: "", 
+              _PROCESSING_TIME: "", 
+              _PROCESSING_USER: "" 
+            }
+          },
+          { session }
+        );
+        
+        await session.commitTransaction();
+        console.log(`Purchase cancelled for item ${itemid}-${serial} by user ${user_id}`);
+        return res.json({ status: "success" });
+      }
+      
+      // Validate item still exists and seller still owns it
+      const item_doc = await items.findOne(
+        { itemId: itemid },
+        { 
+          projection: { "serials.h": 0, history: 0, reselling: 0 },
+          session 
+        }
+      );
+      
+      if (!item_doc) {
+        await robux_market.updateOne(
+          { itemId: itemid, serial },
+          {
+            $unset: { 
+              _PROCESSING: "", 
+              _PROCESSING_TIME: "", 
+              _PROCESSING_USER: "" 
+            }
+          },
+          { session }
+        );
+        
+        await session.abortTransaction();
+        return res.status(400).json({
+          status: "error",
+          error: "Item no longer exists",
+        });
+      }
+      
+      const serial_info = item_doc.serials?.[serial];
+      
+      if (!serial_info || serial_info.u !== lockedDoc.userId) {
+        // Clean up - remove listing since seller no longer owns item
+        await robux_market.deleteOne(
+          { itemId: itemid, serial },
+          { session }
+        );
+        
+        await session.abortTransaction();
+        return res.status(400).json({
+          status: "error",
+          error: "Seller no longer owns this item",
+        });
+      }
+      
+      // --- TRANSFER OWNERSHIP ---
+      // Update item ownership
+      await items.updateOne(
+        { itemId: itemid },
+        {
+          $set: {
+            [`serials.${serial}.u`]: user_id,
+            [`serials.${serial}.t`]: Math.floor(Date.now() / 1000),
+          },
+          $unset: {
+            [`reselling.${serial}`]: "",
+          },
+          $push: {
+            [`serials.${serial}.h`]: [
+              "robux_market",
+              lockedDoc.userId,
+              user_id,
+              lockedDoc.price,
+              Date.now(),
+            ],
+          },
         },
-      },
-      { upsert: true }
-    );
-
-    await robux_market.deleteOne({ itemId: itemid, serial });
-
-    return res.json({ status: "success" });
+        { session }
+      );
+      
+      // Update analytics
+      await robux_market.updateOne(
+        { itemId: "analytics" },
+        {
+          $inc: {
+            total_sales: 1,
+            total_robux: lockedDoc.price,
+            game_raised: lockedDoc.price * 0.1,
+          },
+          $setOnInsert: {
+            createdAt: new Date()
+          }
+        },
+        { 
+          upsert: true,
+          session 
+        }
+      );
+      
+      // Remove the listing
+      await robux_market.deleteOne(
+        { itemId: itemid, serial },
+        { session }
+      );
+      
+      await session.commitTransaction();
+      
+      console.log(`Purchase completed for item ${itemid}-${serial}: ${lockedDoc.userId} -> ${user_id} for ${lockedDoc.price} R$`);
+      
+      return res.json({ 
+        status: "success",
+        price: lockedDoc.price,
+        seller: lockedDoc.userId 
+      });
+      
+    } catch (transactionErr) {
+      await session.abortTransaction();
+      
+      // Clean up lock on transaction failure
+      try {
+        await robux_market.updateOne(
+          { itemId: itemid, serial },
+          {
+            $unset: { 
+              _PROCESSING: "", 
+              _PROCESSING_TIME: "", 
+              _PROCESSING_USER: "" 
+            }
+          }
+        );
+      } catch (cleanupErr) {
+        console.error("Failed to cleanup lock:", cleanupErr);
+      }
+      
+      throw transactionErr;
+    } finally {
+      await session.endSession();
+    }
+    
   } catch (err) {
     console.error("Purchase error:", err);
     return res.status(500).json({
       status: "error",
       error: "Internal server error",
+      message: err.message
     });
+  } finally {
+    if (client) {
+      await client.close();
+    }
   }
 });
 
