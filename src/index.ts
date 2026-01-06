@@ -741,11 +741,17 @@ app.post("/buy", async (req, res) => {
 
 
     if (!token) {
+      const LOCK_TIMEOUT = 5 * 60 * 1000;
+      
       const lockResult = await robux_market.findOneAndUpdate(
         {
           itemId: itemid,
           serial,
-          _PROCESSING: { $exists: false },
+          $or: [
+            { _PROCESSING: { $exists: false } },
+            { _PROCESSING: null },
+            { _PROCESSING_TIME: { $lt: Date.now() - LOCK_TIMEOUT } },
+          ],
         },
         {
           $set: {
