@@ -758,9 +758,9 @@ app.post("/buy", async (req, res) => {
       const lockedDoc = lockResult.value;
       
       if (
-        previous &&
-        previous._PROCESSING &&
-        previous._PROCESSING_TIME > Date.now() - LOCK_TIMEOUT
+        lockedDoc &&
+        lockedDoc._PROCESSING &&
+        lockedDoc._PROCESSING_TIME > Date.now() - LOCK_TIMEOUT
       ) {
         return res.status(400).json({
           status: "error",
