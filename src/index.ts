@@ -747,10 +747,10 @@ app.post("/buy", async (req, res) => {
         ],
       },
       { $set: { _PROCESSING: processing_token, _PROCESSING_TIME: Date.now() } },
-      { returnDocument: "after" }
+      { returnDocument: "after", upsert: true }
     );
 
-    if (!lockResult.value) {
+    if (lockResult.value) {
       return res.status(400).json({ status: "error", error: "Item already processing" });
     }
 
@@ -849,6 +849,7 @@ app.post("/buy", async (req, res) => {
 
 
 export default app
+
 
 
 
