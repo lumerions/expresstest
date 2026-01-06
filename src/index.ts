@@ -755,7 +755,7 @@ app.post("/buy", async (req, res) => {
         { upsert: true, returnDocument: "before" }
       );
       
-      const lockedDoc = lockResult.value;
+      let lockedDoc = lockResult.value;
       
       if (
         lockedDoc &&
@@ -767,8 +767,22 @@ app.post("/buy", async (req, res) => {
           error: "Item already processing",
         });
       }
-
-
+      
+      if (!lockedDoc) {
+        lockedDoc = await robux_market.findOne({
+          itemId: itemid,
+          serial,
+          _PROCESSING: processing_token,
+        });
+      }
+      
+      if (!lockedDoc) {
+        return res.status(400).json({
+          status: "error",
+          error: "Item not listed",
+        });
+      }
+      
       if (lockedDoc.userId === user_id) {
         await robux_market.updateOne(
           { itemId: itemid, serial, _PROCESSING: processing_token },
@@ -779,6 +793,7 @@ app.post("/buy", async (req, res) => {
           error: "Cannot buy your own item",
         });
       }
+
 
       const gamepass_info = await getGamePassProductInfo(
         lockedDoc.gamepassId
