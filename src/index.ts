@@ -740,8 +740,17 @@ app.post("/buy", async (req, res) => {
     robux_market = db.collection("robuxmarket");
     items = db.collection("cp");
 
-
+    
     if (!token) {
+      const listedDoc = await robux_market.findOne({ itemId: itemid, serial });
+      if (!listedDoc) {
+        return res.status(400).json({
+          status: "error",
+          error: "Item not listed",
+        });
+      }
+    
+      // 2️⃣ Try to acquire lock
       const lockResult = await robux_market.findOneAndUpdate(
         {
           itemId: itemid,
@@ -759,16 +768,16 @@ app.post("/buy", async (req, res) => {
         },
         { returnDocument: "after" }
       );
-
-      if (!lockResult.value) {
+    
+      const lockedDoc = lockResult.value;
+    
+      if (!lockedDoc) {
         return res.status(400).json({
           status: "error",
-          error: "Item already processing or not listed",
+          error: "Item already processing",
         });
       }
-
-      const lockedDoc = lockResult.value;
-
+    
       if (lockedDoc.userId === user_id) {
         await robux_market.updateOne(
           { itemId: itemid, serial, _PROCESSING: processing_token },
@@ -779,22 +788,8 @@ app.post("/buy", async (req, res) => {
           error: "Cannot buy your own item",
         });
       }
-
-      const gamepass_info = await getGamePassProductInfo(
-        lockedDoc.gamepassId
-      );
-
-      if (gamepass_info.PriceInRobux !== lockedDoc.price) {
-        await robux_market.updateOne(
-          { itemId: itemid, serial, _PROCESSING: processing_token },
-          { $unset: { _PROCESSING: "", _PROCESSING_TIME: "" } }
-        );
-        return res.status(400).json({
-          status: "error",
-          error: "Price changed",
-        });
-      }
-
+    
+      // 4️⃣ Return token to continue purchase
       return res.json({
         status: "processing",
         token: processing_token,
