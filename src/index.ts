@@ -741,44 +741,33 @@ app.post("/buy", async (req, res) => {
 
 
     if (!token) {
-      const LOCK_TIMEOUT = 5 * 60 * 1000;
+            const LOCK_TIMEOUT = 5 * 60 * 1000;
       
-            const lockResult = await robux_market.findOneAndUpdate(
+      const lockResult = await robux_market.findOneAndUpdate(
+        { itemId: itemid, serial },
         {
-          itemId: itemid,
-          serial,
-          $or: [
-            { _PROCESSING: { $exists: false } },
-            { _PROCESSING: null },
-            { _PROCESSING_TIME: { $lt: Date.now() - LOCK_TIMEOUT } },
-          ],
-        },
-        {
-          $setOnInsert: {
-            itemId: itemid,
-            serial,
-          },
+          $setOnInsert: { itemId: itemid, serial },
           $set: {
             _PROCESSING: processing_token,
             _PROCESSING_TIME: Date.now(),
           },
         },
-        {
-          upsert: true,
-          returnDocument: "after",
-        }
+        { upsert: true, returnDocument: "before" }
       );
+      
       const lockedDoc = lockResult.value;
+      
       if (
-        lockedDoc._PROCESSING &&
-        lockedDoc._PROCESSING !== processing_token &&
-        lockedDoc._PROCESSING_TIME > Date.now() - LOCK_TIMEOUT
+        previous &&
+        previous._PROCESSING &&
+        previous._PROCESSING_TIME > Date.now() - LOCK_TIMEOUT
       ) {
         return res.status(400).json({
           status: "error",
           error: "Item already processing",
         });
       }
+
 
       if (lockedDoc.userId === user_id) {
         await robux_market.updateOne(
