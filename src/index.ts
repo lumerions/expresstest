@@ -719,6 +719,7 @@ app.get("/get", async (req, res) => {
   }
 });
 
+
 app.post("/buy", async (req, res) => {
   const { user_id, item, token, cancel } = req.body;
   let [itemid, serial] = item;
@@ -739,7 +740,7 @@ app.post("/buy", async (req, res) => {
       { returnDocument: "after" }
     );
 
-    if (!lockResult.value) {
+    if (!lockResult) {
       return res
         .status(400)
         .json({ status: "error", error: "Item already processing" });
@@ -891,6 +892,7 @@ app.post("/buy", async (req, res) => {
     return res.status(500).json({ status: "error", error: "Internal server error" });
   }
 });
+
 
 
 export default app
