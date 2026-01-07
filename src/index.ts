@@ -873,7 +873,7 @@ app.post("/buy", async (req, res) => {
 
       res.status(200).json({ status: "success", data: "success" });
     } else {
-      const processing_token = require("crypto").randomBytes(16).toString("hex");
+      const processing_token = crypto.randomBytes(16).toString("hex");
 
       await robux_market.findOneAndUpdate(
         { itemId: itemid, serial },
