@@ -726,166 +726,169 @@ app.post("/buy", async (req, res) => {
   itemid = parseInt(itemid);
   serial = parseInt(serial) - 1;
 
-  const processing_token = crypto.randomBytes(16).toString("hex");
-  const LOCK_TIMEOUT = 5 * 60 * 1000;
+  const database = await mongo_client.db("cool");
+  const robux_market = await database.collection("robuxmarket");
+  const items = await database.collection("cp");
 
-  let client;
-  let robux_market;
-  let items;
+  const unique_lock_field = `locks.${itemid}_${serial}`;
 
   try {
-    client = await getMongoClient();
-    const db = client.db("cool");
+    const lockResult = await robux_market.findOneAndUpdate(
+      { [unique_lock_field]: { $exists: false } },
+      { $set: { [unique_lock_field]: { user_id, timestamp: Date.now() } } },
+      { returnDocument: "after" }
+    );
 
-    robux_market = db.collection("robuxmarket");
-    items = db.collection("cp");
-
-    
-    if (!token) {
-      const listedDoc = await robux_market.findOne({ itemId: itemid, serial });
-      if (!listedDoc) {
-        return res.status(400).json({
-          status: "error",
-          error: "Item not listed",
-        });
-      }
-    
-      // 2️⃣ Try to acquire lock
-      const lockResult = await robux_market.findOneAndUpdate(
-        {
-          itemId: itemid,
-          serial,
-          $or: [
-            { _PROCESSING: { $exists: false } },
-            { _PROCESSING_TIME: { $lt: Date.now() - LOCK_TIMEOUT } },
-          ],
-        },
-        {
-          $set: {
-            _PROCESSING: processing_token,
-            _PROCESSING_TIME: Date.now(),
-          },
-        },
-        { returnDocument: "after" }
-      );
-    
-      const lockedDoc = lockResult.value;
-    
-      if (!lockedDoc) {
-        return res.status(400).json({
-          status: "error",
-          error: "Item already processing",
-        });
-      }
-    
-      if (lockedDoc.userId === user_id) {
-        await robux_market.updateOne(
-          { itemId: itemid, serial, _PROCESSING: processing_token },
-          { $unset: { _PROCESSING: "", _PROCESSING_TIME: "" } }
-        );
-        return res.status(400).json({
-          status: "error",
-          error: "Cannot buy your own item",
-        });
-      }
-    
-      // 4️⃣ Return token to continue purchase
-      return res.json({
-        status: "processing",
-        token: processing_token,
-      });
+    if (!lockResult.value) {
+      return res
+        .status(400)
+        .json({ status: "error", error: "Item already processing" });
     }
 
-    const lockedDoc = await robux_market.findOne({
-      itemId: itemid,
-      serial,
-      _PROCESSING: token,
-    });
+    const listed_doc = await robux_market.findOne({ itemId: itemid, serial });
 
-    if (!lockedDoc) {
-      return res.status(400).json({
-        status: "error",
-        error: "Invalid or expired token",
-      });
-    }
-
-    if (cancel === true) {
+    if (!listed_doc) {
       await robux_market.updateOne(
-        { itemId: itemid, serial, _PROCESSING: token },
-        { $unset: { _PROCESSING: "", _PROCESSING_TIME: "" } }
+        { itemId: itemid, serial },
+        { $unset: { [unique_lock_field]: "" } }
       );
-      return res.json({ status: "success" });
+      return res.status(400).json({ status: "error", error: "Item not listed" });
     }
 
     const item_doc = await items.findOne(
       { itemId: itemid },
       { projection: { "serials.h": 0, history: 0, reselling: 0 } }
     );
-
     if (!item_doc) {
-      return res.status(400).json({
-        status: "error",
-        error: "Invalid item",
-      });
+      await robux_market.updateOne(
+        { itemId: itemid, serial },
+        { $unset: { [unique_lock_field]: "" } }
+      );
+      return res.status(400).json({ status: "error", error: "Invalid Item" });
     }
 
     const serial_info = item_doc.serials[serial];
+    if (!serial_info || serial_info.u !== listed_doc.userId) {
+      await robux_market.updateOne(
+        { itemId: itemid, serial },
+        { $unset: { [unique_lock_field]: "" } }
+      );
 
-    if (!serial_info || serial_info.u !== lockedDoc.userId) {
-      await robux_market.deleteOne({ itemId: itemid, serial });
-      return res.status(400).json({
-        status: "error",
-        error: "Item ownership changed",
-      });
+      if (listed_doc) {
+        await robux_market.deleteOne({ itemId: itemid, serial });
+      }
+
+      //log("1203327439883866163", {
+      //  embeds: [
+       //   {
+       //     title: "Process Request Cancelled",
+       //     description: `**Reason**: Item ownership changed\n**Item**: \`${itemid}-${serial + 1}\`\nBuyer: \`${user_id}\`\nSeller: \`${listed_doc.userId}\``,
+        //    color: 16745728,
+       //   },
+      //  ],
+     //});
+
+      return res.status(400).json({ status: "error", error: "Item ownership changed" });
     }
 
-    /* --------------------------------------------------
-       Transfer ownership
-    -------------------------------------------------- */
+    if (listed_doc.userId == user_id) {
+      await robux_market.updateOne(
+        { itemId: itemid, serial },
+        { $unset: { [unique_lock_field]: "" } }
+      );
+      return res.status(400).json({ status: "error", error: "Cannot buy your own item" });
+    }
 
-    await items.updateOne(
-      { itemId: itemid },
-      {
-        $set: {
-          [`serials.${serial}.u`]: user_id,
-          [`serials.${serial}.t`]: Math.floor(Date.now() / 1000),
-        },
-        $unset: {
-          [`reselling.${serial}`]: "",
-        },
-        $push: {
-          [`serials.${serial}.h`]: [
-            "robux_market",
-            lockedDoc.userId,
-            user_id,
-            lockedDoc.price,
-            Date.now(),
-          ],
-        },
+    if (token) {
+      if (listed_doc._PROCESSING !== token) {
+        await robux_market.updateOne(
+          { itemId: itemid, serial },
+          { $unset: { [unique_lock_field]: "" } }
+        );
+
+      //  log("1203327439883866163", {
+      //   content: `\n\`\`\`\n${JSON.stringify(listed_doc)}\n\`\`\``,
+       //   embeds: [
+       //     {
+        //      title: "[CRITICAL] Process Request Cancelled",
+        //      description: `**Reason**: Invalid token provided\n**Item**: \`${itemid}-${serial + 1}\`\nBuyer: \`${user_id}\`\nSeller: \`${listed_doc.userId}\`\nExpected Token: \`${listed_doc._PROCESSING}\`\nProvided Token: \`${token}\``,
+         //     color: 16745728,
+          //  },
+          //],
+      //  });
+
+        return res.status(400).json({ status: "error", error: "Invalid token" });
       }
-    );
 
-    await robux_market.updateOne(
-      { itemId: "analytics" },
-      {
-        $inc: {
-          total_sales: 1,
-          total_robux: lockedDoc.price,
-          game_raised: lockedDoc.price * 0.1,
-        },
-      },
-      { upsert: true }
-    );
+      if (cancel === true) {
+        await robux_market.updateOne(
+          { itemId: itemid, serial },
+          { $unset: { _PROCESSING: "", [unique_lock_field]: "" } }
+        );
+        return res.status(200).json({ status: "success", data: "success" });
+      }
 
-    await robux_market.deleteOne({ itemId: itemid, serial });
+      await items.updateOne(
+        { itemId: itemid },
+        {
+          $set: {
+            [`serials.${serial}.u`]: user_id,
+            [`serials.${serial}.t`]: Math.floor(Date.now() / 1000),
+          },
+          $unset: {
+            [`reselling.${serial}`]: "",
+          },
+          $push: {
+            [`serials.${serial}.h`]: [
+              "robux_market",
+              listed_doc.userId,
+              user_id,
+              listed_doc.price,
+              Date.now(),
+            ],
+          },
+        }
+      );
 
-    return res.json({ status: "success" });
-  } catch (err) {
-    console.error("Purchase error:", err);
-    return res.status(500).json({
-      status: "error",
-      error: "Internal server error",
-    });
+      await robux_market.updateOne(
+        { itemId: "analytics" },
+        { $inc: { total_sales: 1, total_robux: listed_doc.price, game_raised: listed_doc.price * 0.1 } },
+        { upsert: true }
+      );
+
+      const user_analytics = await database.collection("user_analytics");
+      await user_analytics.findOneAndUpdate(
+        { userId: user_id },
+        { $inc: { total_spent: listed_doc.price, game_raised: listed_doc.price * 0.1 } },
+        { returnDocument: "after", upsert: true }
+      );
+      await user_analytics.findOneAndUpdate(
+        { userId: listed_doc.userId },
+        { $inc: { total_raised: listed_doc.price } },
+        { returnDocument: "after", upsert: true }
+      );
+
+      await robux_market.deleteOne({ itemId: itemid, serial });
+
+      res.status(200).json({ status: "success", data: "success" });
+    } else {
+      const processing_token = require("crypto").randomBytes(16).toString("hex");
+
+      await robux_market.findOneAndUpdate(
+        { itemId: itemid, serial },
+        { $set: { _PROCESSING: processing_token, _PROCESSING_TIME: Date.now() } }
+      );
+
+      await robux_market.updateOne(
+        { itemId: itemid, serial },
+        { $unset: { [unique_lock_field]: "" } }
+      );
+
+      return res.status(200).json({ status: "success", data: processing_token });
+    }
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ status: "error", error: "Internal server error" });
   }
 });
 
