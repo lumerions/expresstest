@@ -219,8 +219,6 @@ app.post("/UpdateOne", async (req, res) => {
       console.error("Logging error:", err);
     }
 
-    console.log("FILTER:", JSON.stringify(filter, null, 2));
-console.log("UPDATE:", JSON.stringify(update, null, 2));
 
     const result = await collection.findOneAndUpdate(
       filter,
