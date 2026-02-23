@@ -218,7 +218,6 @@ app.post("/UpdateOne", async (req, res) => {
       console.error("Logging error:", err);
     }
 
-
     const result = await collection.findOneAndUpdate(
       filter,
       update,
