@@ -318,6 +318,9 @@ app.post("/UpdateBulk", async (req, res) => {
 });
 
 app.get("/GetInventory", async (req, res) => {
+  console.log("HEADERS:", req.headers);
+console.log("TOKEN RAW:", token);
+console.log("TOKEN TYPE:", typeof token);
   const sendResponse = (statusCode: number, content: any) => {
     res.status(statusCode).json(content);
   };
