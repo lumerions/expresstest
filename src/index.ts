@@ -31,6 +31,7 @@ app.get('/healthz', (req, res) => {
 
 app.post("/update-value", async (req, res) => {
     const token = req.headers["x-api-key"];
+  console.log(token)
    let uri = ""
     if (token === "GameSell") { 
         uri = "mongodb+srv://gamblesite_db_user:pYEApJnYBLMz3DGP@gamblesite.ttpjfpf.mongodb.net/gamblesite?retryWrites=true&w=majority&appName=gamblesite"
