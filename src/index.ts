@@ -207,7 +207,6 @@ app.post("/UpdateOne", async (req, res) => {
         await collection.updateOne(filter, { $set: { serials: [doc.serials] } });
       }
     }
-        
 
     try {
       const quantityInc = update["$inc"]?.quantitySold;
