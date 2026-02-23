@@ -12,7 +12,6 @@ const { getGamePassProductInfo, getUsernameFromId, getThumbnails } = Noblox;
 const defaultMongoUri = "mongodb+srv://MongoDB:r7jBEW8yIWqcLZp3@cluster0.m96ya.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 const app = express()
 app.use(express.json()) 
-
 const clients = {};
 
 async function getMongoClient(uri: string) {
