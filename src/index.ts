@@ -495,6 +495,7 @@ app.get("/GetItem", async (req, res) => {
     if (token === "CooleedD") { 
         uri = defaultMongoUri
     }
+
     const client = await getMongoClient(uri);
     const collection = client.db("cool").collection("cp");
 
