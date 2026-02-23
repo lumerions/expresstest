@@ -24,7 +24,6 @@ async function getMongoClient(uri: string) {
   return clients[uri];
 }
 
-console.log("Connected to MongoDB")
 
 app.get('/healthz', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() })
