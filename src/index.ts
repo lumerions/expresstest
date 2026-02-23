@@ -165,14 +165,23 @@ app.post('/insert-item', async (req, res) => {
 });
 
 app.post("/UpdateOne", async (req, res) => {
- = ""
-    if (token === "GameSell") { 
-        uri = defaultMongoUri
-    }
-    if (token === "CooleedD") { 
-        uri = "mongodb+srv://gamblesite_db_user:pYEApJnYBLMz3DGP@gamblesite.ttpjfpf.mongodb.net/gamblesite?retryWrites=true&w=majority&appName=gamblesite"
-    }
-  const client = await getMongoClient(uri);
+  const token = req.headers["x-api-key"];
+
+  let uri = "";
+
+  if (token === "GameSell") {
+    uri = defaultMongoUri;
+  }
+
+  if (token === "CooleedD") {
+    uri = "mongodb+srv://gamblesite_db_user:pYEApJnYBLMz3DGP@gamblesite.ttpjfpf.mongodb.net/gamblesite?retryWrites=true&w=majority&appName=gamblesite";
+  }
+
+  if (!uri) {
+    return res.status(403).json({ error: "Invalid API key" });
+  }
+
+  const client = await getMongoClient(uri);;
 
   try {
     if (!client) {
@@ -810,12 +819,12 @@ app.post("/buy", async (req, res) => {
   itemid = parseInt(itemid);
   serial = parseInt(serial) - 1;
 
-    const token = req.headers["x-api-key"];
+    const tokenn = req.headers["x-api-key"];
    let uri = ""
-    if (token === "GameSell") { 
+    if (tokenn === "GameSell") { 
         uri = "mongodb+srv://gamblesite_db_user:pYEApJnYBLMz3DGP@gamblesite.ttpjfpf.mongodb.net/gamblesite?retryWrites=true&w=majority&appName=gamblesite"
     }
-    if (token === "CooleedD") { 
+    if (tokenn === "CooleedD") { 
         uri = defaultMongoUri
     }
   const client = await getMongoClient(uri);
