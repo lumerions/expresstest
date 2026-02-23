@@ -779,6 +779,7 @@ app.get("/get", async (req, res) => {
     if (token === "CooleedD") { 
         uri = defaultMongoUri
     }
+
     const client = await getMongoClient(uri);
     const database = client.db("cool");
     const robux_market = database.collection("robuxmarket");
