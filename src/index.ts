@@ -24,11 +24,6 @@ async function getMongoClient(uri: string) {
   return clients[uri];
 }
 
-
-app.get('/healthz', (req, res) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() })
-})
-
 app.post("/update-value", async (req, res) => {
     const token = req.headers["x-api-key"];
   console.log(token)
