@@ -9,31 +9,27 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 import Noblox from "noblox.js";
 const { getGamePassProductInfo, getUsernameFromId, getThumbnails } = Noblox;
-const defaultMongoUri = "mongodb+srv://MongoDB:r7jBEW8yIWqcLZp3@cluster0.m96ya.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+
 const app = express()
 app.use(express.json()) 
-const clients = {};
 
-async function getMongoClient(uri: string) {
-  if (!clients[uri]) {
-    const client = new MongoClient(uri);
-    await client.connect();
-    clients[uri] = client;
+let mongo_client 
+
+async function getMongoClient() {
+  if (!mongo_client) {
+    mongo_client = new MongoClient("mongodb+srv://MongoDB:r7jBEW8yIWqcLZp3@cluster0.m96ya.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0");
+    await mongo_client.connect();
   }
-  return clients[uri];
+  return mongo_client;
 }
+console.log("Connected to MongoDB")
+
+app.get('/healthz', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() })
+})
 
 app.post("/update-value", async (req, res) => {
-    const token = req.headers["x-api-key"];
-  console.log(token)
-   let uri = ""
-    if (token === "GameSell") { 
-        uri = "mongodb+srv://gamblesite_db_user:pYEApJnYBLMz3DGP@gamblesite.ttpjfpf.mongodb.net/gamblesite?retryWrites=true&w=majority&appName=gamblesite"
-    }
-    if (token === "CooleedD") { 
-        uri = defaultMongoUri
-    }
-    const client = await getMongoClient(uri); 
+    const client = await getMongoClient(); 
 
     const { itemId, value } = req.body;
 
@@ -77,16 +73,7 @@ app.post("/update-value", async (req, res) => {
 
 
 app.post('/insert-item', async (req, res) => {
-    const token = req.headers["x-api-key"];
-
-   let uri = ""
-    if (token === "GameSell") { 
-        uri = "mongodb+srv://gamblesite_db_user:pYEApJnYBLMz3DGP@gamblesite.ttpjfpf.mongodb.net/gamblesite?retryWrites=true&w=majority&appName=gamblesite"
-    }
-    if (token === "CooleedD") { 
-        uri = defaultMongoUri
-    }
-    const client = await getMongoClient(uri);
+    const client = await getMongoClient();
 
    let {
         itemId,
@@ -160,33 +147,18 @@ app.post('/insert-item', async (req, res) => {
 });
 
 app.post("/UpdateOne", async (req, res) => {
-  const token = req.headers["x-api-key"];
 
-  let uri = "";
-
-  if (token === "GameSell") {
-    uri = defaultMongoUri;
-  }
-
-  if (token === "CooleedD") {
-    uri = "mongodb+srv://gamblesite_db_user:pYEApJnYBLMz3DGP@gamblesite.ttpjfpf.mongodb.net/gamblesite?retryWrites=true&w=majority&appName=gamblesite";
-  }
-
-  if (!uri) {
-    return res.status(403).json({ error: "Invalid API key" });
-  }
-
-  const client = await getMongoClient(uri);;
+  await getMongoClient(); 
 
   try {
-    if (!client) {
+    if (!mongo_client) {
       return res.status(500).json({ status: "error", message: "MongoDB client not initialized" });
     }
 
     console.log("REQ BODY:", JSON.stringify(req.body, null, 2));
 
 
-    const collection = client.db("cool").collection("cp");
+    const collection = mongo_client.db("cool").collection("cp");
 
     const filter = req.body.filter;
     const update = req.body.update;
@@ -207,6 +179,7 @@ app.post("/UpdateOne", async (req, res) => {
         await collection.updateOne(filter, { $set: { serials: [doc.serials] } });
       }
     }
+        
 
     try {
       const quantityInc = update["$inc"]?.quantitySold;
@@ -217,6 +190,9 @@ app.post("/UpdateOne", async (req, res) => {
     } catch (err) {
       console.error("Logging error:", err);
     }
+
+    console.log("FILTER:", JSON.stringify(filter, null, 2));
+console.log("UPDATE:", JSON.stringify(update, null, 2));
 
     const result = await collection.findOneAndUpdate(
       filter,
@@ -243,16 +219,7 @@ app.post("/UpdateOne", async (req, res) => {
 
 app.post("/UpdateBulk", async (req, res) => {
   try {
-
-    const token = req.headers["x-api-key"];
-   let uri = ""
-    if (token === "GameSell") { 
-        uri = "mongodb+srv://gamblesite_db_user:pYEApJnYBLMz3DGP@gamblesite.ttpjfpf.mongodb.net/gamblesite?retryWrites=true&w=majority&appName=gamblesite"
-    }
-    if (token === "CooleedD") { 
-        uri = defaultMongoUri
-    }
-    const client = await getMongoClient(uri);
+    const client = await getMongoClient();
     const collection = client.db("cool").collection("cp");
 
     const bulkOps = [];
@@ -308,7 +275,6 @@ app.post("/UpdateBulk", async (req, res) => {
 });
 
 app.get("/GetInventory", async (req, res) => {
-
   const sendResponse = (statusCode: number, content: any) => {
     res.status(statusCode).json(content);
   };
@@ -322,19 +288,7 @@ app.get("/GetInventory", async (req, res) => {
       });
     }
 
-    const token = req.headers["x-api-key"];
-   let uri = ""
-    if (token === "GameSell") { 
-        uri = "mongodb+srv://gamblesite_db_user:pYEApJnYBLMz3DGP@gamblesite.ttpjfpf.mongodb.net/gamblesite?retryWrites=true&w=majority&appName=gamblesite"
-    }
-    if (token === "CooleedD") { 
-        uri = defaultMongoUri
-    }
-
-      console.log("HEADERS:", req.headers);
-console.log("TOKEN RAW:", token);
-console.log("TOKEN TYPE:", typeof token);
-    const client = await getMongoClient(uri);
+    const client = await getMongoClient();
     const database = client.db("cool");
 
     await checkIfEligibleForStarterItems(database, parseInt(userId as string));
@@ -438,16 +392,7 @@ app.get("/GetInventoryBulk", async (req, res) => {
       });
     }
 
-    const token = req.headers["x-api-key"];
-   let uri = ""
-    if (token === "GameSell") { 
-        uri = "mongodb+srv://gamblesite_db_user:pYEApJnYBLMz3DGP@gamblesite.ttpjfpf.mongodb.net/gamblesite?retryWrites=true&w=majority&appName=gamblesite"
-    }
-    if (token === "CooleedD") { 
-        uri = defaultMongoUri
-    }
-
-    const client = await getMongoClient(uri);
+    const client = await getMongoClient();
     const db = client.db("cool");
     const itemsCollection = db.collection("cp");
 
@@ -487,16 +432,7 @@ app.get("/GetInventoryBulk", async (req, res) => {
 
 app.get("/GetItem", async (req, res) => {
   try {
-    const token = req.headers["x-api-key"];
-   let uri = ""
-    if (token === "GameSell") { 
-        uri = "mongodb+srv://gamblesite_db_user:pYEApJnYBLMz3DGP@gamblesite.ttpjfpf.mongodb.net/gamblesite?retryWrites=true&w=majority&appName=gamblesite"
-    }
-    if (token === "CooleedD") { 
-        uri = defaultMongoUri
-    }
-
-    const client = await getMongoClient(uri);
+    const client = await getMongoClient();
     const collection = client.db("cool").collection("cp");
 
     const filter: any = { ...req.query };
@@ -569,16 +505,7 @@ app.delete("/unlist", async (req, res) => {
     itemid = parseInt(itemid);
     serial = parseInt(serial) - 1;
 
-    const token = req.headers["x-api-key"];
-   let uri = ""
-    if (token === "GameSell") { 
-        uri = "mongodb+srv://gamblesite_db_user:pYEApJnYBLMz3DGP@gamblesite.ttpjfpf.mongodb.net/gamblesite?retryWrites=true&w=majority&appName=gamblesite"
-    }
-    if (token === "CooleedD") { 
-        uri = defaultMongoUri
-    }
-
-    const client = await getMongoClient(uri);
+    const client = await getMongoClient();
     const robux_market = client
       .db("cool")
       .collection("robuxmarket");
@@ -645,15 +572,7 @@ app.post("/list", async (req, res) => {
     itemid = parseInt(itemid);
     serial = parseInt(serial) - 1;
 
-    const token = req.headers["x-api-key"];
-   let uri = ""
-    if (token === "GameSell") { 
-        uri = "mongodb+srv://gamblesite_db_user:pYEApJnYBLMz3DGP@gamblesite.ttpjfpf.mongodb.net/gamblesite?retryWrites=true&w=majority&appName=gamblesite"
-    }
-    if (token === "CooleedD") { 
-        uri = defaultMongoUri
-    }
-    const client = await getMongoClient(uri);
+    const client = await getMongoClient();
 
     const robux_market = await getRobuxMarket(client);
     const items = await getItemss(client);
@@ -771,16 +690,7 @@ app.post("/list", async (req, res) => {
 
 app.get("/get", async (req, res) => {
   try {
-    const token = req.headers["x-api-key"];
-   let uri = ""
-    if (token === "GameSell") { 
-        uri = "mongodb+srv://gamblesite_db_user:pYEApJnYBLMz3DGP@gamblesite.ttpjfpf.mongodb.net/gamblesite?retryWrites=true&w=majority&appName=gamblesite"
-    }
-    if (token === "CooleedD") { 
-        uri = defaultMongoUri
-    }
-
-    const client = await getMongoClient(uri);
+    const client = await getMongoClient();
     const database = client.db("cool");
     const robux_market = database.collection("robuxmarket");
 
@@ -817,16 +727,7 @@ app.post("/buy", async (req, res) => {
   itemid = parseInt(itemid);
   serial = parseInt(serial) - 1;
 
-    const tokenn = req.headers["x-api-key"];
-   let uri = ""
-    if (tokenn === "GameSell") { 
-        uri = "mongodb+srv://gamblesite_db_user:pYEApJnYBLMz3DGP@gamblesite.ttpjfpf.mongodb.net/gamblesite?retryWrites=true&w=majority&appName=gamblesite"
-    }
-    if (tokenn === "CooleedD") { 
-        uri = defaultMongoUri
-    }
-  const client = await getMongoClient(uri);
-  const database = await client.db("cool");
+  const database = await mongo_client.db("cool");
   const robux_market = await database.collection("robuxmarket");
   const items = await database.collection("cp");
 
@@ -995,6 +896,7 @@ app.post("/buy", async (req, res) => {
 
 
 export default app
+
 
 
 
