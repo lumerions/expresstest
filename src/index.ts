@@ -12,7 +12,7 @@ const { getGamePassProductInfo, getUsernameFromId, getThumbnails } = Noblox;
 
 const app = express()
 app.use(express.json()) 
-const g = 1000
+let g = 1000
 let mongo_client 
 
 async function getMongoClient() {
