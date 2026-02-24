@@ -17,7 +17,7 @@ let mongo_client
 
 async function getMongoClient() {
   if (!mongo_client) {
-    mongo_client = new MongoClient("mongodb+srv://MongoDB:r7jBEW8yIWqcLZp3@cluster0.m96ya.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0");
+    mongo_client = new MongoClient("mongodb+srv://gamblesite_db_user:pYEApJnYBLMz3DGP@gamblesite.ttpjfpf.mongodb.net/gamblesite?retryWrites=true&w=majority&appName=gamblesite");
     await mongo_client.connect();
   }
   return mongo_client;
