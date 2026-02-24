@@ -12,7 +12,7 @@ const { getGamePassProductInfo, getUsernameFromId, getThumbnails } = Noblox;
 
 const app = express()
 app.use(express.json()) 
-
+const g = 1000
 let mongo_client 
 
 async function getMongoClient() {
@@ -21,8 +21,10 @@ async function getMongoClient() {
     //mongo_client = new MongoClient("");
     //await mongo_client.connect();
   }
+  if (g === 10000) {
+    return mongo_client;
+  }
   //return mongo_client;
-  return 0;
 }
 console.log("Connected to MongoDB")
 
