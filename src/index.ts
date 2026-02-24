@@ -18,10 +18,11 @@ let mongo_client
 async function getMongoClient() {
   if (!mongo_client) {
     //mongo_client = new MongoClient("mongodb+srv://gamblesite_db_user:pYEApJnYBLMz3DGP@gamblesite.ttpjfpf.mongodb.net/gamblesite?retryWrites=true&w=majority&appName=gamblesite");
-    mongo_client = new MongoClient("");
-    await mongo_client.connect();
+    //mongo_client = new MongoClient("");
+    //await mongo_client.connect();
   }
-  return mongo_client;
+  //return mongo_client;
+  return 0;
 }
 console.log("Connected to MongoDB")
 
